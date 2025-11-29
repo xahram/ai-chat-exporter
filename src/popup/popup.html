@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Chat Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">C</div>
+      <div class="header-text">
+        <h1>Claude Chat Exporter</h1>
+        <p class="subtitle">Export your conversation to PDF</p>
+      </div>
+    </header>
+
+    <main class="content">
+      <button id="exportPDF" class="btn-export">
+        <div class="icon-wrapper">PDF</div>
+        <div class="btn-text">
+          <span class="label">Export as PDF</span>
+          <span class="desc">Formatted document for sharing</span>
+        </div>
+      </button>
+
+      <div id="status" class="status"></div>
+
+      <div id="warning" class="warning">
+        <div class="warning-icon">!</div>
+        <p class="warning-title">Hidden Content Detected</p>
+        <p class="warning-text">Some messages have "Show more" buttons. The hidden content won't be included in the export.</p>
+        <p class="warning-text">Click "Show more" on all messages first, or continue anyway.</p>
+        <div class="warning-buttons">
+          <button id="cancelExport" class="btn-cancel">Cancel</button>
+          <button id="confirmExport" class="btn-confirm">Continue</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      v1.0.0 - Made for Claude.ai
+    </footer>
+  </div>
+
+  <script src="pdf-exporter.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
