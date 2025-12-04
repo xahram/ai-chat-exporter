@@ -10,6 +10,7 @@ const PDFExporter = {
   margin: 15,
   contentWidth: 0,
   yPosition: 0,
+  platform: 'Claude', // Default platform name
 
   /**
    * Normalizes text for PDF compatibility
@@ -86,9 +87,11 @@ const PDFExporter = {
   /**
    * Exports conversation data to PDF
    * @param {Object} conversationData
+   * @param {string} platform - Platform name (Claude or ChatGPT)
    * @returns {Promise<jsPDF>}
    */
-  async export(conversationData) {
+  async export(conversationData, platform = 'Claude') {
+    this.platform = platform;
     await this.loadLibrary();
     this.initDocument();
     this.renderHeader(conversationData);
@@ -189,19 +192,26 @@ const PDFExporter = {
   },
 
   /**
-   * Renders message header (User/Claude label)
+   * Renders message header (You/Assistant label)
    * @param {boolean} isUser
    */
   renderMessageHeader(isUser) {
-    const { doc, margin, contentWidth } = this;
+    const { doc, margin, contentWidth, platform } = this;
 
     doc.setFont(undefined, 'bold');
     doc.setFontSize(11);
-    doc.setFillColor(isUser ? 59 : 217, isUser ? 130 : 119, isUser ? 246 : 6);
+    // User: purple/blue, Assistant: orange for Claude, green for ChatGPT
+    if (isUser) {
+      doc.setFillColor(59, 130, 246); // Blue for user
+    } else if (platform === 'ChatGPT') {
+      doc.setFillColor(16, 163, 127); // Green for ChatGPT
+    } else {
+      doc.setFillColor(217, 119, 6); // Orange for Claude
+    }
     doc.setTextColor(255, 255, 255);
 
     doc.roundedRect(margin, this.yPosition - 5, contentWidth, 10, 2, 2, 'F');
-    doc.text(isUser ? 'User' : 'Claude', margin + 5, this.yPosition + 1);
+    doc.text(isUser ? 'You' : platform, margin + 5, this.yPosition + 1);
     this.yPosition += 12;
   },
 
@@ -226,6 +236,8 @@ const PDFExporter = {
         this.renderTextPart(part.content);
       } else if (part.type === 'code') {
         this.renderCodeBlock(part);
+      } else if (part.type === 'table') {
+        this.renderTable(part.content);
       }
     });
 
@@ -233,30 +245,70 @@ const PDFExporter = {
   },
 
   /**
-   * Parses content into text and code parts
+   * Parses content into text, code, and table parts
    * @param {string} content
    * @returns {Array}
    */
   parseContent(content) {
     const parts = [];
+    // Match code blocks and tables
     const codeBlockRegex = /```([^\n]*)\n([\s\S]*?)```/g;
+    const tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|[\r\n]*)+)/g;
+
     let lastIndex = 0;
+
+    // First, find all code blocks and tables with their positions
+    const blocks = [];
+
     let match;
-
     while ((match = codeBlockRegex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        const text = content.substring(lastIndex, match.index).trim();
-        if (text) parts.push({ type: 'text', content: text });
-      }
-
-      parts.push({
+      blocks.push({
         type: 'code',
+        start: match.index,
+        end: match.index + match[0].length,
         language: match[1].trim() || 'code',
         content: match[2].trim()
       });
-
-      lastIndex = match.index + match[0].length;
     }
+
+    while ((match = tableRegex.exec(content)) !== null) {
+      // Check if this table is inside a code block
+      const isInsideCode = blocks.some(b => b.type === 'code' && match.index >= b.start && match.index < b.end);
+      if (!isInsideCode) {
+        blocks.push({
+          type: 'table',
+          start: match.index,
+          end: match.index + match[0].length,
+          content: match[1].trim()
+        });
+      }
+    }
+
+    // Sort by position
+    blocks.sort((a, b) => a.start - b.start);
+
+    // Build parts array
+    blocks.forEach(block => {
+      if (block.start > lastIndex) {
+        const text = content.substring(lastIndex, block.start).trim();
+        if (text) parts.push({ type: 'text', content: text });
+      }
+
+      if (block.type === 'code') {
+        parts.push({
+          type: 'code',
+          language: block.language,
+          content: block.content
+        });
+      } else if (block.type === 'table') {
+        parts.push({
+          type: 'table',
+          content: block.content
+        });
+      }
+
+      lastIndex = block.end;
+    });
 
     if (lastIndex < content.length) {
       const text = content.substring(lastIndex).trim();
@@ -409,6 +461,87 @@ const PDFExporter = {
     this.yPosition += 6;
     doc.setFont('helvetica', 'normal');
     doc.setLineWidth(0.2);
+  },
+
+  /**
+   * Renders a markdown-style table
+   * @param {string} tableContent - Markdown table string
+   */
+  renderTable(tableContent) {
+    const { doc, margin, contentWidth } = this;
+
+    // Parse the markdown table
+    const lines = tableContent.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return;
+
+    // Parse rows
+    const rows = [];
+    lines.forEach((line, idx) => {
+      // Skip separator row (contains only dashes and pipes)
+      if (/^\|[\s-:|]+\|$/.test(line)) return;
+
+      const cells = line.split('|')
+        .filter((_, i, arr) => i > 0 && i < arr.length - 1) // Remove empty first/last from split
+        .map(cell => cell.trim());
+
+      if (cells.length > 0) {
+        rows.push(cells);
+      }
+    });
+
+    if (rows.length === 0) return;
+
+    // Calculate column widths
+    const numCols = Math.max(...rows.map(r => r.length));
+    const colWidth = (contentWidth - 10) / numCols;
+    const rowHeight = 7;
+    const tableStartY = this.yPosition;
+
+    // Check if we need a page break for at least header + 1 row
+    this.checkPageBreak(rowHeight * 2 + 10);
+
+    doc.setFontSize(9);
+    doc.setLineWidth(0.3);
+
+    rows.forEach((row, rowIdx) => {
+      // Check for page break
+      if (this.checkPageBreak(rowHeight + 2)) {
+        doc.setFontSize(9);
+      }
+
+      const rowY = this.yPosition;
+
+      // Draw row background (header gets different color)
+      if (rowIdx === 0) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin + 3, rowY - 5, contentWidth - 6, rowHeight, 'F');
+        doc.setFont(undefined, 'bold');
+      } else {
+        doc.setFont(undefined, 'normal');
+      }
+
+      // Draw cells
+      doc.setTextColor(30, 30, 30);
+      row.forEach((cell, colIdx) => {
+        const cellX = margin + 5 + (colIdx * colWidth);
+        const cellText = doc.splitTextToSize(cell, colWidth - 4)[0] || ''; // Truncate if needed
+        doc.text(cellText, cellX, rowY);
+      });
+
+      // Draw horizontal line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin + 3, rowY + 2, margin + contentWidth - 3, rowY + 2);
+
+      this.yPosition += rowHeight;
+    });
+
+    // Draw outer border
+    doc.setDrawColor(180, 180, 180);
+    const tableHeight = this.yPosition - tableStartY;
+    doc.rect(margin + 3, tableStartY - 5, contentWidth - 6, tableHeight + 2);
+
+    this.yPosition += 6;
+    doc.setFont('helvetica', 'normal');
   },
 
   /**

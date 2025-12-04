@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "Claude Chat Exporter",
-  "version": "1.0.0",
-  "description": "Export Claude.ai conversations to PDF",
+  "name": "AI Chat Exporter",
+  "version": "1.1.0",
+  "description": "Export Claude.ai and ChatGPT conversations to PDF",
 
   "browser_specific_settings": {
     "gecko": {
@@ -35,6 +35,10 @@
     {
       "matches": ["*://claude.ai/*"],
       "js": ["src/content/extractor.js"]
+    },
+    {
+      "matches": ["*://chat.openai.com/*", "*://chatgpt.com/*"],
+      "js": ["src/content/chatgpt-extractor.js"]
     }
   ],
 

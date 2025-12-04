@@ -42,12 +42,15 @@ const PopupController = {
 
       const tab = await this.getActiveTab();
 
-      if (!this.isClaudePage(tab)) {
-        this.showStatus('Please open a Claude.ai conversation', 'error');
+      if (!this.isSupportedPage(tab)) {
+        this.showStatus('Please open a Claude.ai or ChatGPT conversation', 'error');
         return;
       }
 
-      await this.injectContentScript(tab.id);
+      // Store current platform for filename generation
+      this.currentPlatform = this.getPlatformName(tab);
+
+      await this.injectContentScript(tab);
       const data = await this.extractConversation(tab.id);
 
       if (!data || data.messages.length === 0) {
@@ -132,13 +135,58 @@ const PopupController = {
   },
 
   /**
-   * Injects content script if needed
-   * @param {number} tabId
+   * Checks if tab is on ChatGPT
+   * @param {Object} tab
+   * @returns {boolean}
    */
-  async injectContentScript(tabId) {
+  isChatGPTPage(tab) {
+    return tab.url?.includes('chat.openai.com') || tab.url?.includes('chatgpt.com');
+  },
+
+  /**
+   * Checks if tab is on a supported chat platform
+   * @param {Object} tab
+   * @returns {boolean}
+   */
+  isSupportedPage(tab) {
+    return this.isClaudePage(tab) || this.isChatGPTPage(tab);
+  },
+
+  /**
+   * Gets the platform name for display
+   * @param {Object} tab
+   * @returns {string}
+   */
+  getPlatformName(tab) {
+    if (this.isClaudePage(tab)) return 'Claude';
+    if (this.isChatGPTPage(tab)) return 'ChatGPT';
+    return 'Unknown';
+  },
+
+  /**
+   * Gets the content script file for the current platform
+   * @param {Object} tab
+   * @returns {string}
+   */
+  getContentScriptFile(tab) {
+    if (this.isClaudePage(tab)) return 'src/content/extractor.js';
+    if (this.isChatGPTPage(tab)) return 'src/content/chatgpt-extractor.js';
+    return null;
+  },
+
+  /**
+   * Injects content script if needed
+   * @param {Object} tab - The tab object
+   */
+  async injectContentScript(tab) {
+    const scriptFile = this.getContentScriptFile(tab);
+    if (!scriptFile) {
+      throw new Error('Unsupported platform');
+    }
+
     try {
-      await browser.tabs.executeScript(tabId, {
-        file: 'src/content/extractor.js'
+      await browser.tabs.executeScript(tab.id, {
+        file: scriptFile
       });
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (e) {
@@ -171,7 +219,7 @@ const PopupController = {
   async exportToPDF(data) {
     this.showStatus('Generating PDF...', 'info');
 
-    const doc = await PDFExporter.export(data);
+    const doc = await PDFExporter.export(data, this.currentPlatform);
     const filename = this.generateFilename(data.title);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
@@ -199,7 +247,8 @@ const PopupController = {
       .toLowerCase()
       .substring(0, 50);
     const date = new Date().toISOString().split('T')[0];
-    return `claude_chat_${safeTitle}_${date}.pdf`;
+    const platform = (this.currentPlatform || 'chat').toLowerCase();
+    return `${platform}_chat_${safeTitle}_${date}.pdf`;
   },
 
   /**
