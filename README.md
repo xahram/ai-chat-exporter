@@ -1,14 +1,21 @@
-# Claude Chat Exporter
+# AI Chat Exporter
 
-A Firefox browser extension that exports Claude.ai conversations to well-formatted PDF documents.
+A Firefox browser extension that exports AI chat conversations to well-formatted PDF documents.
+
+## Supported Platforms
+
+- **Claude.ai** - https://claude.ai
+- **ChatGPT** - https://chat.openai.com & https://chatgpt.com
 
 ## Features
 
-- **PDF Export**: Generate clean, readable PDFs from any Claude conversation
+- **PDF Export**: Generate clean, readable PDFs from any conversation
+- **Multi-Platform**: Supports both Claude.ai and ChatGPT
 - **Smart Extraction**: Automatically identifies the active chat, ignoring sidebar content
 - **Code Preservation**: Maintains code blocks with language labels
 - **List Support**: Preserves bullet points and numbered lists
-- **Clean Formatting**: Clear visual distinction between user and Claude messages
+- **Table Support**: Renders tables from ChatGPT conversations
+- **Clean Formatting**: Clear visual distinction between user and assistant messages
 
 ## Installation
 
@@ -25,7 +32,7 @@ Package the extension as an `.xpi` file and submit to Firefox Add-ons.
 
 ## Usage
 
-1. Navigate to [claude.ai](https://claude.ai) and open a conversation
+1. Navigate to [claude.ai](https://claude.ai) or [chatgpt.com](https://chatgpt.com) and open a conversation
 2. Click the extension icon in the Firefox toolbar
 3. Click **"Export as PDF"**
 4. Choose a save location when prompted
@@ -33,7 +40,7 @@ Package the extension as an `.xpi` file and submit to Firefox Add-ons.
 ## Project Structure
 
 ```
-claude-chat-exporter/
+ai-chat-exporter/
 ├── manifest.json                 # Extension manifest (permissions, scripts, icons)
 ├── README.md                     # This file
 ├── ARCHITECTURE.md               # Technical architecture documentation
@@ -46,7 +53,8 @@ claude-chat-exporter/
 │   │   └── background.js        # Service worker for file downloads
 │   │
 │   ├── content/
-│   │   └── extractor.js         # DOM parser for chat extraction
+│   │   ├── extractor.js         # DOM parser for Claude chat extraction
+│   │   └── chatgpt-extractor.js # DOM parser for ChatGPT chat extraction
 │   │
 │   └── popup/
 │       ├── popup.html           # Extension popup markup
@@ -54,21 +62,19 @@ claude-chat-exporter/
 │       ├── popup.js             # Popup controller/orchestrator
 │       └── pdf-exporter.js      # PDF document generator
 │
-├── assets/
-│   └── icons/
-│       ├── icon-48.png          # Toolbar icon
-│       └── icon-96.png          # High-DPI toolbar icon
-│
-└── docs/
-    ├── sample.pdf               # Example exported PDF
-    └── Screenshot...png         # Claude.ai interface reference
+└── assets/
+    └── icons/
+        ├── icon-48.png          # Toolbar icon
+        └── icon-96.png          # High-DPI toolbar icon
 ```
 
 ## Component Overview
 
-### 1. Content Script (`src/content/extractor.js`)
+### 1. Content Scripts (`src/content/`)
 
-**Purpose**: Runs in the context of claude.ai pages to extract conversation data.
+**Purpose**: Runs in the context of chat pages to extract conversation data.
+
+#### Claude Extractor (`extractor.js`)
 
 **Key Object**: `ChatExtractor`
 
@@ -80,10 +86,22 @@ claude-chat-exporter/
 | `extractFormattedText()` | Preserves code blocks, lists, inline code |
 | `cleanUserText()` | Removes avatar initials from user messages |
 
+#### ChatGPT Extractor (`chatgpt-extractor.js`)
+
+**Key Object**: `ChatGPTExtractor`
+
+| Method | Description |
+|--------|-------------|
+| `extract()` | Main entry point, returns conversation data object |
+| `findChatContainer()` | Locates the main chat area |
+| `extractMessages()` | Collects all user and assistant messages |
+| `extractFormattedText()` | Preserves code blocks, lists, tables |
+
 **Output Format**:
 ```javascript
 {
   title: "Conversation Title",
+  platform: "claude" | "chatgpt",
   messages: [
     { role: "user", content: "...", timestamp: "..." },
     { role: "assistant", content: "...", timestamp: "..." }
@@ -123,13 +141,14 @@ claude-chat-exporter/
 | `renderMessage()` | Single message with header and content |
 | `renderTextPart()` | Regular text with list detection |
 | `renderCodeBlock()` | Formatted code with language label |
-| `parseListItem()` | Detects bullets (•, -, *) and numbers |
+| `parseListItem()` | Detects bullets and numbers |
 
 **PDF Structure**:
 - Header: Title + export timestamp
-- Messages: Colored header bar (blue=user, orange=Claude) + content
+- Messages: Colored header bar (blue=user, orange=Claude, green=ChatGPT) + content
 - Code blocks: Gray background, monospace font, language label
 - Lists: Proper indentation with bullet/number preservation
+- Tables: Markdown-style table rendering
 
 ### 4. Background Script (`src/background/background.js`)
 
@@ -150,12 +169,12 @@ User clicks "Export as PDF"
          ▼
    PopupController
          │
-         ├──► Injects extractor.js (if needed)
+         ├──► Detects platform (Claude/ChatGPT)
          │
-         ├──► Sends 'extractConversation' message
+         ├──► Injects appropriate extractor
          │           │
          │           ▼
-         │    ChatExtractor.extract()
+         │    Extractor.extract()
          │           │
          │           ▼
          │    Returns conversation data
@@ -176,48 +195,6 @@ User clicks "Export as PDF"
               Browser download dialog
 ```
 
-## DOM Selectors Used
-
-The extension targets these Claude.ai DOM elements:
-
-| Selector | Purpose |
-|----------|---------|
-| `.font-claude-response-body` | Claude's message content |
-| `[class*="bg-bg-300"]` | User message bubbles |
-| `div[class*="max-w-3xl"]` | Main chat container |
-| `pre > code` | Code blocks |
-| `ul`, `ol` | Lists |
-
-**Note**: These selectors may change if Claude.ai updates their UI. Check `extractor.js` if extraction breaks.
-
-## Extending the Extension
-
-### Adding New Export Formats
-
-1. Create new exporter in `src/popup/` (e.g., `json-exporter.js`)
-2. Add button to `popup.html`
-3. Add handler in `popup.js`
-4. Add download handler in `background.js` if needed
-
-### Modifying PDF Layout
-
-Edit `src/popup/pdf-exporter.js`:
-- `renderHeader()` - Change title/date formatting
-- `renderMessageHeader()` - Modify user/Claude labels
-- `renderCodeBlock()` - Adjust code styling
-- Colors are RGB values in `doc.setFillColor()` calls
-
-### Fixing Extraction Issues
-
-If chat extraction breaks after Claude.ai updates:
-
-1. Open browser DevTools on claude.ai
-2. Inspect the chat message elements
-3. Update selectors in `src/content/extractor.js`:
-   - `findChatContainer()` - Main container selectors
-   - `extractClaudeMessages()` - Claude message selector
-   - `extractUserMessages()` - User message selector
-
 ## Browser Permissions
 
 | Permission | Reason |
@@ -232,7 +209,7 @@ If chat extraction breaks after Claude.ai updates:
 ## Troubleshooting
 
 ### "No messages found"
-- Ensure you're on a claude.ai conversation page (not the home page)
+- Ensure you're on a conversation page (not the home page)
 - The chat must have at least one exchange
 
 ### PDF has wrong content
