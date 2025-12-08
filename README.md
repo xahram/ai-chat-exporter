@@ -28,7 +28,7 @@ A Firefox browser extension that exports AI chat conversations to well-formatted
 
 ### Permanent Installation
 
-Package the extension as an `.xpi` file and submit to Firefox Add-ons.
+Install from [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/ai-chat-exporter/).
 
 ## Usage
 
