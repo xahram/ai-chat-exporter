@@ -339,13 +339,18 @@ const ChatGPTExtractor = {
    * @returns {string}
    */
   extractTitle() {
-    // ChatGPT title selectors
+    // Use document.title first (shows in browser tab)
+    const pageTitle = document.title?.trim();
+    if (pageTitle && pageTitle !== 'ChatGPT' && !pageTitle.startsWith('ChatGPT')) {
+      return pageTitle;
+    }
+
+    // Fallback selectors
     const selectors = [
       'h1',
       '[data-testid="conversation-title"]',
       'nav a[class*="active"]',
-      'nav li[class*="active"]',
-      'title'
+      'nav li[class*="active"]'
     ];
 
     for (const selector of selectors) {
@@ -356,12 +361,6 @@ const ChatGPTExtractor = {
       if (text && text !== 'ChatGPT' && text !== 'New chat' && text.length > 2) {
         return text;
       }
-    }
-
-    // Try to get from page title
-    const pageTitle = document.title;
-    if (pageTitle && !pageTitle.includes('ChatGPT')) {
-      return pageTitle;
     }
 
     return 'ChatGPT Conversation';

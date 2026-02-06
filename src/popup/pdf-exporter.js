@@ -200,11 +200,13 @@ const PDFExporter = {
 
     doc.setFont(undefined, 'bold');
     doc.setFontSize(11);
-    // User: purple/blue, Assistant: orange for Claude, green for ChatGPT
+    // User: blue, Assistant: platform-specific color
     if (isUser) {
       doc.setFillColor(59, 130, 246); // Blue for user
     } else if (platform === 'ChatGPT') {
       doc.setFillColor(16, 163, 127); // Green for ChatGPT
+    } else if (platform === 'Gemini') {
+      doc.setFillColor(168, 127, 255); // Purple for Gemini (based on Gemini gradient)
     } else {
       doc.setFillColor(217, 119, 6); // Orange for Claude
     }

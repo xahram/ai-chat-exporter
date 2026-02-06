@@ -43,7 +43,7 @@ const PopupController = {
       const tab = await this.getActiveTab();
 
       if (!this.isSupportedPage(tab)) {
-        this.showStatus('Please open a Claude.ai or ChatGPT conversation', 'error');
+        this.showStatus('Please open a Claude.ai, ChatGPT, or Gemini conversation', 'error');
         return;
       }
 
@@ -144,12 +144,21 @@ const PopupController = {
   },
 
   /**
+   * Checks if tab is on Gemini
+   * @param {Object} tab
+   * @returns {boolean}
+   */
+  isGeminiPage(tab) {
+    return tab.url?.includes('gemini.google.com');
+  },
+
+  /**
    * Checks if tab is on a supported chat platform
    * @param {Object} tab
    * @returns {boolean}
    */
   isSupportedPage(tab) {
-    return this.isClaudePage(tab) || this.isChatGPTPage(tab);
+    return this.isClaudePage(tab) || this.isChatGPTPage(tab) || this.isGeminiPage(tab);
   },
 
   /**
@@ -160,6 +169,7 @@ const PopupController = {
   getPlatformName(tab) {
     if (this.isClaudePage(tab)) return 'Claude';
     if (this.isChatGPTPage(tab)) return 'ChatGPT';
+    if (this.isGeminiPage(tab)) return 'Gemini';
     return 'Unknown';
   },
 
@@ -169,8 +179,9 @@ const PopupController = {
    * @returns {string}
    */
   getContentScriptFile(tab) {
-    if (this.isClaudePage(tab)) return 'src/content/extractor.js';
+    if (this.isClaudePage(tab)) return 'src/content/claude-extractor.js';
     if (this.isChatGPTPage(tab)) return 'src/content/chatgpt-extractor.js';
+    if (this.isGeminiPage(tab)) return 'src/content/gemini-extractor.js';
     return null;
   },
 
