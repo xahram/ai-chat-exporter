@@ -126,11 +126,13 @@ const PDFExporter = {
   /**
    * Exports conversation data to PDF
    * @param {Object} conversationData
-   * @param {string} platform - Platform name (Claude or ChatGPT)
+   * @param {string} platform - Platform name (Claude, ChatGPT, or Gemini)
+   * @param {Object} settings - User settings for customization
    * @returns {Promise<jsPDF>}
    */
-  async export(conversationData, platform = 'Claude') {
+  async export(conversationData, platform = 'Claude', settings = {}) {
     this.platform = platform;
+    this.settings = settings;
     await this.loadLibrary();
     this.initDocument();
     this.renderHeader(conversationData);
@@ -250,25 +252,48 @@ const PDFExporter = {
    * Renders message header (You/Assistant label)
    * @param {boolean} isUser
    */
+  /**
+   * Converts hex color string to RGB array
+   * @param {string} hex - Color in #RRGGBB format
+   * @returns {number[]} [r, g, b]
+   */
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+      : [128, 128, 128];
+  },
+
   renderMessageHeader(isUser) {
     const { doc, margin, contentWidth, platform } = this;
+    const s = this.settings || {};
 
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(11);
-    // User: blue, Assistant: platform-specific color
+    doc.setFontSize(s.headerFontSize || 11);
+
+    // Get header color from settings or use defaults
+    let color;
     if (isUser) {
-      doc.setFillColor(59, 130, 246); // Blue for user
+      color = this.hexToRgb(s.userHeaderColor || '#3B82F6');
     } else if (platform === 'ChatGPT') {
-      doc.setFillColor(16, 163, 127); // Green for ChatGPT
+      color = this.hexToRgb(s.chatgptHeaderColor || '#10A37F');
     } else if (platform === 'Gemini') {
-      doc.setFillColor(168, 127, 255); // Purple for Gemini (based on Gemini gradient)
+      color = this.hexToRgb(s.geminiHeaderColor || '#A87FFF');
     } else {
-      doc.setFillColor(217, 119, 6); // Orange for Claude
+      color = this.hexToRgb(s.claudeHeaderColor || '#D97706');
     }
+    doc.setFillColor(color[0], color[1], color[2]);
     doc.setTextColor(255, 255, 255);
 
     doc.roundedRect(margin, this.yPosition - 5, contentWidth, 10, 2, 2, 'F');
-    doc.text(isUser ? 'You' : platform, margin + 5, this.yPosition + 1);
+
+    // Get display name from settings or use defaults
+    const userLabel = s.userDisplayName || 'You';
+    let llmLabel = platform;
+    if (platform === 'Claude' && s.claudeDisplayName) llmLabel = s.claudeDisplayName;
+    else if (platform === 'ChatGPT' && s.chatgptDisplayName) llmLabel = s.chatgptDisplayName;
+    else if (platform === 'Gemini' && s.geminiDisplayName) llmLabel = s.geminiDisplayName;
+    doc.text(isUser ? userLabel : llmLabel, margin + 5, this.yPosition + 1);
     this.yPosition += 12;
   },
 
@@ -279,10 +304,11 @@ const PDFExporter = {
    */
   renderMessageContent(content, isUser) {
     const { doc } = this;
+    const s = this.settings || {};
 
     doc.setTextColor(30, 30, 30);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(s.contentFontSize || 10);
 
     // Normalize content to handle Unicode characters
     const normalizedContent = this.normalizeText(content);
@@ -381,9 +407,10 @@ const PDFExporter = {
    */
   renderTextPart(content) {
     const { doc, margin, contentWidth } = this;
+    const s = this.settings || {};
 
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(s.contentFontSize || 10);
     doc.setTextColor(30, 30, 30);
 
     const paragraphs = content.split('\n');

@@ -3,15 +3,115 @@
  * Handles UI interactions and export workflow
  */
 
+const DEFAULT_SETTINGS = {
+  userDisplayName: 'You',
+  claudeDisplayName: '',
+  chatgptDisplayName: '',
+  geminiDisplayName: '',
+  userHeaderColor: '#3B82F6',
+  claudeHeaderColor: '#D97706',
+  chatgptHeaderColor: '#10A37F',
+  geminiHeaderColor: '#A87FFF',
+  contentFontSize: 10,
+  headerFontSize: 11,
+};
+
 const PopupController = {
   statusEl: null,
+  settings: { ...DEFAULT_SETTINGS },
 
   /**
    * Initializes the popup
    */
-  init() {
+  async init() {
     this.statusEl = document.getElementById('status');
+    await this.loadSettings();
     this.bindEvents();
+  },
+
+  /**
+   * Loads settings from browser.storage.local
+   */
+  async loadSettings() {
+    try {
+      const result = await browser.storage.local.get('settings');
+      if (result.settings) {
+        this.settings = { ...DEFAULT_SETTINGS, ...result.settings };
+      }
+    } catch (e) {
+      console.log('Could not load settings:', e.message);
+    }
+    this.applySettingsToUI();
+  },
+
+  /**
+   * Saves current settings to browser.storage.local
+   */
+  async saveSettings() {
+    try {
+      await browser.storage.local.set({ settings: this.settings });
+    } catch (e) {
+      console.log('Could not save settings:', e.message);
+    }
+  },
+
+  /**
+   * Applies loaded settings to the settings UI inputs
+   */
+  applySettingsToUI() {
+    document.getElementById('userDisplayName').value = this.settings.userDisplayName;
+    document.getElementById('claudeDisplayName').value = this.settings.claudeDisplayName;
+    document.getElementById('chatgptDisplayName').value = this.settings.chatgptDisplayName;
+    document.getElementById('geminiDisplayName').value = this.settings.geminiDisplayName;
+    document.getElementById('userHeaderColor').value = this.settings.userHeaderColor;
+    document.getElementById('claudeHeaderColor').value = this.settings.claudeHeaderColor;
+    document.getElementById('chatgptHeaderColor').value = this.settings.chatgptHeaderColor;
+    document.getElementById('geminiHeaderColor').value = this.settings.geminiHeaderColor;
+    document.getElementById('contentFontSize').value = this.settings.contentFontSize;
+    document.getElementById('headerFontSize').value = this.settings.headerFontSize;
+  },
+
+  /**
+   * Reads settings from UI inputs and saves
+   */
+  readSettingsFromUI() {
+    this.settings.userDisplayName = document.getElementById('userDisplayName').value.trim() || 'You';
+    this.settings.claudeDisplayName = document.getElementById('claudeDisplayName').value.trim();
+    this.settings.chatgptDisplayName = document.getElementById('chatgptDisplayName').value.trim();
+    this.settings.geminiDisplayName = document.getElementById('geminiDisplayName').value.trim();
+    this.settings.userHeaderColor = document.getElementById('userHeaderColor').value;
+    this.settings.claudeHeaderColor = document.getElementById('claudeHeaderColor').value;
+    this.settings.chatgptHeaderColor = document.getElementById('chatgptHeaderColor').value;
+    this.settings.geminiHeaderColor = document.getElementById('geminiHeaderColor').value;
+    this.settings.contentFontSize = parseInt(document.getElementById('contentFontSize').value) || 10;
+    this.settings.headerFontSize = parseInt(document.getElementById('headerFontSize').value) || 11;
+    this.saveSettings();
+  },
+
+  /**
+   * Shows settings panel, hides main panel
+   */
+  showSettings() {
+    document.getElementById('mainPanel').style.display = 'none';
+    document.getElementById('settingsPanel').style.display = '';
+  },
+
+  /**
+   * Hides settings panel, shows main panel
+   */
+  hideSettings() {
+    this.readSettingsFromUI();
+    document.getElementById('settingsPanel').style.display = 'none';
+    document.getElementById('mainPanel').style.display = '';
+  },
+
+  /**
+   * Resets all settings to defaults
+   */
+  resetSettings() {
+    this.settings = { ...DEFAULT_SETTINGS };
+    this.applySettingsToUI();
+    this.saveSettings();
   },
 
   /**
@@ -28,6 +128,25 @@ const PopupController = {
 
     document.getElementById('cancelExport').addEventListener('click', () => {
       this.cancelExport();
+    });
+
+    // Settings panel
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      this.showSettings();
+    });
+
+    document.getElementById('backBtn').addEventListener('click', () => {
+      this.hideSettings();
+    });
+
+    document.getElementById('resetSettings').addEventListener('click', () => {
+      this.resetSettings();
+    });
+
+    // Auto-save on any input change
+    const settingInputs = document.querySelectorAll('#settingsPanel input');
+    settingInputs.forEach(input => {
+      input.addEventListener('change', () => this.readSettingsFromUI());
     });
   },
 
@@ -230,7 +349,7 @@ const PopupController = {
   async exportToPDF(data) {
     this.showStatus('Generating PDF...', 'info');
 
-    const doc = await PDFExporter.export(data, this.currentPlatform);
+    const doc = await PDFExporter.export(data, this.currentPlatform, this.settings);
     const filename = this.generateFilename(data.title);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 

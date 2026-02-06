@@ -8,40 +8,117 @@
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <div class="logo">AI</div>
-      <div class="header-text">
-        <h1>AI Chat Exporter</h1>
-        <p class="subtitle">Export Claude, ChatGPT, or Gemini to PDF</p>
-      </div>
-    </header>
-
-    <main class="content">
-      <button id="exportPDF" class="btn-export">
-        <div class="icon-wrapper">PDF</div>
-        <div class="btn-text">
-          <span class="label">Export as PDF</span>
-          <span class="desc">Formatted document for sharing</span>
+    <!-- Main Panel -->
+    <div id="mainPanel">
+      <header class="header">
+        <div class="logo">AI</div>
+        <div class="header-text">
+          <h1>AI Chat Exporter</h1>
+          <p class="subtitle">Export Claude, ChatGPT, or Gemini to PDF</p>
         </div>
-      </button>
+        <button id="settingsBtn" class="btn-gear" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </header>
 
-      <div id="status" class="status"></div>
+      <main class="content">
+        <button id="exportPDF" class="btn-export">
+          <div class="icon-wrapper">PDF</div>
+          <div class="btn-text">
+            <span class="label">Export as PDF</span>
+            <span class="desc">Formatted document for sharing</span>
+          </div>
+        </button>
 
-      <div id="warning" class="warning">
-        <div class="warning-icon">!</div>
-        <p class="warning-title">Hidden Content Detected</p>
-        <p class="warning-text">Some messages have "Show more" buttons. The hidden content won't be included in the export.</p>
-        <p class="warning-text">Click "Show more" on all messages first, or continue anyway.</p>
-        <div class="warning-buttons">
-          <button id="cancelExport" class="btn-cancel">Cancel</button>
-          <button id="confirmExport" class="btn-confirm">Continue</button>
+        <div id="status" class="status"></div>
+
+        <div id="warning" class="warning">
+          <div class="warning-icon">!</div>
+          <p class="warning-title">Hidden Content Detected</p>
+          <p class="warning-text">Some messages have "Show more" buttons. The hidden content won't be included in the export.</p>
+          <p class="warning-text">Click "Show more" on all messages first, or continue anyway.</p>
+          <div class="warning-buttons">
+            <button id="cancelExport" class="btn-cancel">Cancel</button>
+            <button id="confirmExport" class="btn-confirm">Continue</button>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
 
-    <footer class="footer">
-      v1.2.1 - Claude.ai, ChatGPT & Gemini
-    </footer>
+      <footer class="footer">
+        v1.2.1 - Claude.ai, ChatGPT & Gemini
+      </footer>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="settings-panel" style="display: none;">
+      <div class="settings-header">
+        <button id="backBtn" class="btn-back" title="Back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <h2>Settings</h2>
+      </div>
+
+      <div class="settings-body">
+        <div class="settings-section">
+          <h3>Display Names</h3>
+          <div class="setting-row">
+            <label for="userDisplayName">Your name</label>
+            <input type="text" id="userDisplayName" placeholder="You" maxlength="20">
+          </div>
+          <div class="setting-row">
+            <label for="claudeDisplayName">Claude name <span class="setting-hint">blank = Claude</span></label>
+            <input type="text" id="claudeDisplayName" placeholder="Claude" maxlength="20">
+          </div>
+          <div class="setting-row">
+            <label for="chatgptDisplayName">ChatGPT name <span class="setting-hint">blank = ChatGPT</span></label>
+            <input type="text" id="chatgptDisplayName" placeholder="ChatGPT" maxlength="20">
+          </div>
+          <div class="setting-row">
+            <label for="geminiDisplayName">Gemini name <span class="setting-hint">blank = Gemini</span></label>
+            <input type="text" id="geminiDisplayName" placeholder="Gemini" maxlength="20">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Header Colors</h3>
+          <div class="setting-row color-row">
+            <label for="userHeaderColor">Your messages</label>
+            <input type="color" id="userHeaderColor" value="#3B82F6">
+          </div>
+          <div class="setting-row color-row">
+            <label for="claudeHeaderColor">Claude</label>
+            <input type="color" id="claudeHeaderColor" value="#D97706">
+          </div>
+          <div class="setting-row color-row">
+            <label for="chatgptHeaderColor">ChatGPT</label>
+            <input type="color" id="chatgptHeaderColor" value="#10A37F">
+          </div>
+          <div class="setting-row color-row">
+            <label for="geminiHeaderColor">Gemini</label>
+            <input type="color" id="geminiHeaderColor" value="#A87FFF">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Font Sizes</h3>
+          <div class="setting-row">
+            <label for="contentFontSize">Content text (pt)</label>
+            <input type="number" id="contentFontSize" value="10" min="6" max="16" step="1">
+          </div>
+          <div class="setting-row">
+            <label for="headerFontSize">Header label (pt)</label>
+            <input type="number" id="headerFontSize" value="11" min="8" max="18" step="1">
+          </div>
+        </div>
+
+        <button id="resetSettings" class="btn-reset">Reset to Defaults</button>
+      </div>
+    </div>
   </div>
 
   <script src="pdf-exporter.js"></script>
