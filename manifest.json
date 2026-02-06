@@ -47,7 +47,8 @@
   ],
 
   "web_accessible_resources": [
-    "lib/jspdf.umd.min.js"
+    "lib/jspdf.umd.min.js",
+    "lib/emoji-font.js"
   ],
 
   "icons": {

@@ -227,6 +227,13 @@ const ChatExtractor = {
       }
     });
 
+    // Handle bold/strong text
+    clone.querySelectorAll('b, strong').forEach(bold => {
+      if (!bold.closest('pre')) {
+        bold.replaceWith(document.createTextNode(`**${bold.textContent}**`));
+      }
+    });
+
     // Use textContent for final extraction to avoid any remaining span spacing issues
     // Then normalize whitespace while preserving intentional line breaks
     let text = clone.textContent || '';

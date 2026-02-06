@@ -12,6 +12,37 @@ const PDFExporter = {
   yPosition: 0,
   platform: 'Claude', // Default platform name
 
+  // Emoji codepoints included in our subset font
+  SUBSET_EMOJIS: new Set([
+    0x261D, 0x2615, 0x2699, 0x26A0, 0x26A1, 0x267B, 0x270B, 0x270C,
+    0x2705, 0x2714, 0x2716, 0x2728, 0x274C, 0x2753, 0x2757, 0x2764,
+    0x27A1, 0x2B05, 0x2B06, 0x2B07, 0x2B50,
+    0x1F31F, 0x1F381, 0x1F389, 0x1F38A, 0x1F3AF, 0x1F3C6,
+    0x1F44A, 0x1F44B, 0x1F44C, 0x1F44D, 0x1F44E, 0x1F44F,
+    0x1F494, 0x1F499, 0x1F49A, 0x1F49B, 0x1F49C, 0x1F4A1,
+    0x1F4A5, 0x1F4AA, 0x1F4AF, 0x1F4BB, 0x1F4CB, 0x1F4CC,
+    0x1F4CE, 0x1F4D6, 0x1F4DA, 0x1F4DD, 0x1F4E7, 0x1F4F1,
+    0x1F504, 0x1F50D, 0x1F511, 0x1F512, 0x1F513, 0x1F517,
+    0x1F525, 0x1F527, 0x1F5A4, 0x1F600, 0x1F601, 0x1F602,
+    0x1F603, 0x1F604, 0x1F605, 0x1F606, 0x1F609, 0x1F60A,
+    0x1F60D, 0x1F60E, 0x1F60F, 0x1F610, 0x1F612, 0x1F614,
+    0x1F615, 0x1F618, 0x1F61E, 0x1F620, 0x1F622, 0x1F62D,
+    0x1F62E, 0x1F631, 0x1F633, 0x1F634, 0x1F642, 0x1F643,
+    0x1F644, 0x1F64C, 0x1F64F, 0x1F680, 0x1F6AB, 0x1F6D1,
+    0x1F91D, 0x1F91E, 0x1F914, 0x1F917, 0x1F923, 0x1F929,
+    0x1F970, 0x1F973, 0x1F97A, 0x1F9E1,
+  ]),
+
+  /**
+   * Checks if a character is in our emoji subset font
+   * @param {string} char
+   * @returns {boolean}
+   */
+  isSubsetEmoji(char) {
+    if (!this.emojiFont) return false;
+    return this.SUBSET_EMOJIS.has(char.codePointAt(0));
+  },
+
   /**
    * Normalizes text for PDF compatibility
    * Removes problematic Unicode characters that cause spacing issues in jsPDF
@@ -61,17 +92,25 @@ const PDFExporter = {
       .replace(/[\u2000-\u200A]/g, ' ')
       // Remove word joiners and other invisible chars
       .replace(/[\u2060-\u206F]/g, '')
-      // Dingbats
-      .replace(/[\u2700-\u27BF]/g, '')
-      // Emojis
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '');
+      // Dingbats (preserve subset: ✅✔✖☑☝✋✌➡ etc.)
+      .replace(/[\u2700-\u27BF]/g, char => {
+        return this.isSubsetEmoji(char) ? char : '';
+      })
+      // Emojis (preserve those in our subset font)
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, char => {
+        return this.isSubsetEmoji(char) ? char : '';
+      });
 
-    // Final cleanup: ensure only printable ASCII and basic extended Latin
-    // This is aggressive but ensures jsPDF compatibility
-    result = result.split('').map(char => {
-      const code = char.charCodeAt(0);
+    // Final cleanup: ensure only printable ASCII, extended Latin, and supported emojis
+    // Use Array.from to correctly iterate over multi-byte emoji characters
+    result = Array.from(result).map(char => {
+      const code = char.codePointAt(0);
       // Allow: printable ASCII (32-126), newlines/tabs, and extended Latin (160-255)
       if ((code >= 32 && code <= 126) || code === 10 || code === 13 || code === 9 || (code >= 160 && code <= 255)) {
+        return char;
+      }
+      // Allow supported emoji characters
+      if (this.isSubsetEmoji(char)) {
         return char;
       }
       // Replace other chars with space or empty based on category
@@ -100,22 +139,29 @@ const PDFExporter = {
   },
 
   /**
-   * Loads jsPDF library dynamically
+   * Loads jsPDF library and emoji font dynamically
    */
   async loadLibrary() {
-    if (window.jspdf) return;
+    const loadScript = (src) => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = browser.runtime.getURL(src);
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    };
 
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = browser.runtime.getURL('lib/jspdf.umd.min.js');
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+    if (!window.jspdf) {
+      await loadScript('lib/jspdf.umd.min.js');
+    }
+    if (!window.EMOJI_FONT_BASE64) {
+      await loadScript('lib/emoji-font.js');
+    }
   },
 
   /**
-   * Initializes PDF document
+   * Initializes PDF document and registers emoji font
    */
   initDocument() {
     const { jsPDF } = window.jspdf;
@@ -124,6 +170,15 @@ const PDFExporter = {
     this.pageHeight = this.doc.internal.pageSize.getHeight();
     this.contentWidth = this.pageWidth - 2 * this.margin;
     this.yPosition = this.margin;
+
+    // Register emoji font if available
+    if (window.EMOJI_FONT_BASE64) {
+      this.doc.addFileToVFS('NotoEmoji.ttf', window.EMOJI_FONT_BASE64);
+      this.doc.addFont('NotoEmoji.ttf', 'NotoEmoji', 'normal');
+      this.emojiFont = true;
+    } else {
+      this.emojiFont = false;
+    }
   },
 
   /**
@@ -349,20 +404,142 @@ const PDFExporter = {
         doc.setFont(undefined, 'normal');
       }
 
-      // Render text with wrapping
+      // Render text with wrapping and bold support
       const cleanText = text.replace(/`([^`]+)`/g, '$1');
+      // Strip ** markers for width calculation so line-wrapping is accurate
+      const textForWrapping = cleanText.replace(/\*\*(.+?)\*\*/g, '$1');
       const availableWidth = bulletChar ? contentWidth - (indent - margin) - 3 : contentWidth - 6;
-      const lines = doc.splitTextToSize(cleanText, availableWidth);
+      const lines = doc.splitTextToSize(textForWrapping, availableWidth);
 
+      // Build a mapping: consume from the original text with markers to re-apply bold per line
+      let remaining = cleanText;
       lines.forEach((line, i) => {
         this.checkPageBreak(6);
         const xPos = i === 0 && bulletChar ? indent : (bulletChar ? indent : margin + 3);
-        doc.text(line, xPos, this.yPosition);
+
+        // Find matching portion in the original text (with ** markers)
+        const plainLineLen = line.length;
+        let consumed = 0;
+        let markedLine = '';
+        let ri = 0;
+        while (consumed < plainLineLen && ri < remaining.length) {
+          if (remaining[ri] === '*' && remaining[ri + 1] === '*') {
+            // Find closing **
+            const closeIdx = remaining.indexOf('**', ri + 2);
+            if (closeIdx !== -1) {
+              const boldContent = remaining.substring(ri + 2, closeIdx);
+              const canConsume = Math.min(boldContent.length, plainLineLen - consumed);
+              markedLine += '**' + boldContent.substring(0, canConsume) + '**';
+              consumed += canConsume;
+              if (canConsume === boldContent.length) {
+                ri = closeIdx + 2;
+              } else {
+                // Partial bold — adjust remaining for next line
+                remaining = remaining.substring(0, ri + 2) + boldContent.substring(canConsume) + remaining.substring(closeIdx);
+                ri = ri + 2 + canConsume + 2;
+              }
+            } else {
+              markedLine += remaining[ri];
+              consumed++;
+              ri++;
+            }
+          } else {
+            markedLine += remaining[ri];
+            consumed++;
+            ri++;
+          }
+        }
+        remaining = remaining.substring(ri);
+
+        const segments = this.parseBoldSegments(markedLine);
+        this.renderFormattedLine(segments, xPos);
         this.yPosition += 5;
       });
     });
 
     this.yPosition += 4;
+  },
+
+  /**
+   * Parses text into segments of normal and bold text
+   * @param {string} text
+   * @returns {Array<{text: string, bold: boolean}>}
+   */
+  parseBoldSegments(text) {
+    const segments = [];
+    const regex = /\*\*(.+?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ text: text.substring(lastIndex, match.index), bold: false });
+      }
+      segments.push({ text: match[1], bold: true });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      segments.push({ text: text.substring(lastIndex), bold: false });
+    }
+
+    return segments.length > 0 ? segments : [{ text, bold: false }];
+  },
+
+  /**
+   * Splits text into runs of regular text and emoji characters
+   * @param {string} text
+   * @returns {Array<{text: string, isEmoji: boolean}>}
+   */
+  splitEmojiRuns(text) {
+    if (!this.emojiFont) return [{ text, isEmoji: false }];
+
+    const runs = [];
+    let currentRun = '';
+    let currentIsEmoji = false;
+
+    for (const char of text) {
+      const isEmoji = this.isSubsetEmoji(char);
+      if (isEmoji !== currentIsEmoji && currentRun) {
+        runs.push({ text: currentRun, isEmoji: currentIsEmoji });
+        currentRun = '';
+      }
+      currentIsEmoji = isEmoji;
+      currentRun += char;
+    }
+    if (currentRun) {
+      runs.push({ text: currentRun, isEmoji: currentIsEmoji });
+    }
+
+    return runs;
+  },
+
+  /**
+   * Renders a line with inline bold segments and emoji font switching
+   * @param {Array<{text: string, bold: boolean}>} segments
+   * @param {number} x - Starting x position
+   */
+  renderFormattedLine(segments, x) {
+    const { doc } = this;
+    let currentX = x;
+
+    segments.forEach(segment => {
+      if (!segment.text) return;
+
+      const runs = this.splitEmojiRuns(segment.text);
+      runs.forEach(run => {
+        if (!run.text) return;
+        if (run.isEmoji) {
+          doc.setFont('NotoEmoji', 'normal');
+        } else {
+          doc.setFont('helvetica', segment.bold ? 'bold' : 'normal');
+        }
+        doc.text(run.text, currentX, this.yPosition);
+        currentX += doc.getTextWidth(run.text);
+      });
+    });
+
+    doc.setFont('helvetica', 'normal');
   },
 
   /**

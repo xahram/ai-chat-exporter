@@ -324,6 +324,13 @@ const ChatGPTExtractor = {
       }
     });
 
+    // Handle bold/strong text
+    clone.querySelectorAll('b, strong').forEach(bold => {
+      if (!bold.closest('pre')) {
+        bold.replaceWith(document.createTextNode(`**${bold.textContent}**`));
+      }
+    });
+
     // Get final text
     let text = clone.textContent || '';
 
