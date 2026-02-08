@@ -6,16 +6,22 @@ A Firefox browser extension that exports AI chat conversations to well-formatted
 
 - **Claude.ai** - https://claude.ai
 - **ChatGPT** - https://chat.openai.com & https://chatgpt.com
+- **Gemini** - https://gemini.google.com
 
 ## Features
 
 - **PDF Export**: Generate clean, readable PDFs from any conversation
-- **Multi-Platform**: Supports both Claude.ai and ChatGPT
+- **Multi-Platform**: Supports Claude.ai, ChatGPT, and Google Gemini
 - **Smart Extraction**: Automatically identifies the active chat, ignoring sidebar content
-- **Code Preservation**: Maintains code blocks with language labels
-- **List Support**: Preserves bullet points and numbered lists
-- **Table Support**: Renders tables from ChatGPT conversations
-- **Clean Formatting**: Clear visual distinction between user and assistant messages
+- **Code Preservation**: Maintains code blocks with language labels and monospace formatting
+- **List Support**: Preserves bullet points and numbered lists with proper indentation
+- **Table Support**: Renders markdown-style tables with headers and borders
+- **Bold Text**: Preserves bold/strong formatting from all platforms
+- **Emoji Rendering**: Renders 335 common emoji as actual glyphs using a custom PUA-remapped font
+- **LaTeX Equations**: Renders mathematical equations beautifully using MathJax (SVG to PNG pipeline)
+- **Horizontal Rules**: Preserves `<hr>` dividers as graphical lines in the PDF
+- **Customizable Settings**: Configure header colors, display names, and font sizes (persisted across sessions)
+- **Clean Formatting**: Colored header bars (blue=user, orange=Claude, green=ChatGPT, purple=Gemini)
 
 ## Installation
 
@@ -32,167 +38,103 @@ Install from [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/ai-chat-
 
 ## Usage
 
-1. Navigate to [claude.ai](https://claude.ai) or [chatgpt.com](https://chatgpt.com) and open a conversation
+1. Navigate to [claude.ai](https://claude.ai), [chatgpt.com](https://chatgpt.com), or [gemini.google.com](https://gemini.google.com) and open a conversation
 2. Click the extension icon in the Firefox toolbar
 3. Click **"Export as PDF"**
 4. Choose a save location when prompted
+
+### Settings
+
+Click the gear icon in the popup to customize:
+- Display names for user and AI headers
+- Header bar colors per platform
+- Content and header font sizes
+- All settings persist across browser sessions
 
 ## Project Structure
 
 ```
 ai-chat-exporter/
-├── manifest.json                 # Extension manifest (permissions, scripts, icons)
-├── README.md                     # This file
-├── ARCHITECTURE.md               # Technical architecture documentation
+├── manifest.json                    # Extension manifest
+├── README.md                        # This file
+│
+├── docs/
+│   ├── ARCHITECTURE.md              # Technical architecture deep-dive
+│   ├── CHANGELOG.md                 # Version history
+│   ├── PLAN.md                      # Bold text & emoji plan (historical)
+│   ├── PLAN-SETTINGS.md             # Settings feature plan (historical)
+│   └── 260208a_emoji_and_latex_pdf_rendering.md  # Emoji & LaTeX implementation log
+│
+├── scripts/
+│   ├── build-font.py                # Emoji font builder (fontTools)
+│   └── gen-map.py                   # Emoji PUA map generator
 │
 ├── lib/
-│   └── jspdf.umd.min.js         # jsPDF library for PDF generation
+│   ├── jspdf.umd.min.js            # jsPDF 2.5.1 - PDF generation
+│   ├── emoji-font.js               # PUA-remapped Noto Emoji subset (335 glyphs)
+│   └── tex-svg.js                   # MathJax tex-to-SVG bundle
 │
 ├── src/
 │   ├── background/
-│   │   └── background.js        # Service worker for file downloads
+│   │   └── background.js           # Service worker for file downloads
 │   │
 │   ├── content/
-│   │   ├── extractor.js         # DOM parser for Claude chat extraction
-│   │   └── chatgpt-extractor.js # DOM parser for ChatGPT chat extraction
+│   │   ├── claude-extractor.js      # Claude DOM extraction
+│   │   ├── chatgpt-extractor.js     # ChatGPT DOM extraction
+│   │   └── gemini-extractor.js      # Gemini DOM extraction
 │   │
 │   └── popup/
-│       ├── popup.html           # Extension popup markup
-│       ├── popup.css            # Popup styles
-│       ├── popup.js             # Popup controller/orchestrator
-│       └── pdf-exporter.js      # PDF document generator
+│       ├── popup.html               # Extension popup markup
+│       ├── popup.css                # Popup styles
+│       ├── popup.js                 # Popup controller & settings
+│       └── pdf-exporter.js          # PDF document generator
 │
 └── assets/
     └── icons/
-        ├── icon-48.png          # Toolbar icon
-        └── icon-96.png          # High-DPI toolbar icon
+        ├── icon-48.png              # Toolbar icon
+        └── icon-96.png              # High-DPI toolbar icon
 ```
 
-## Component Overview
+## How It Works
 
-### 1. Content Scripts (`src/content/`)
+### Extraction Pipeline
 
-**Purpose**: Runs in the context of chat pages to extract conversation data.
+Each platform has a dedicated content script that runs on the chat page:
 
-#### Claude Extractor (`extractor.js`)
+1. **Find chat container** - Locates the main conversation area (excludes sidebar)
+2. **Extract messages** - Iterates through user/assistant message pairs
+3. **Preserve formatting** - Converts DOM elements to markdown-style text:
+   - Code blocks: `` ```language ... ``` ``
+   - Bold: `**text**`
+   - Lists: `- item` / `1. item`
+   - Tables: `| col | col |`
+   - LaTeX: `$$equation$$` / `$inline$`
+   - Horizontal rules: `---`
+4. **KaTeX handling** - Extracts raw LaTeX from `annotation[encoding="application/x-tex"]` to avoid duplicated garbled output from KaTeX's dual rendering
 
-**Key Object**: `ChatExtractor`
+### PDF Rendering
 
-| Method | Description |
-|--------|-------------|
-| `extract()` | Main entry point, returns conversation data object |
-| `findChatContainer()` | Locates the main chat area, excluding sidebar |
-| `extractMessages()` | Collects all user and Claude messages |
-| `extractFormattedText()` | Preserves code blocks, lists, inline code |
-| `cleanUserText()` | Removes avatar initials from user messages |
+The PDF exporter (`pdf-exporter.js`) processes the extracted markdown-style content:
 
-#### ChatGPT Extractor (`chatgpt-extractor.js`)
+1. **Text normalization** - Converts Unicode to PDF-safe characters, maps emoji to PUA codepoints
+2. **Content parsing** - Splits into text, code blocks, tables, and LaTeX blocks
+3. **Bold rendering** - Parses `**markers**` and renders with font weight switching
+4. **Emoji rendering** - Switches to NotoEmoji font for PUA characters, estimates width from font metrics (advance=2600, unitsPerEm=2048)
+5. **LaTeX rendering** - MathJax SVG -> Canvas -> PNG -> `jsPDF.addImage()`
+6. **Horizontal rules** - Detected as `---` lines, rendered as graphical lines with spacing
 
-**Key Object**: `ChatGPTExtractor`
-
-| Method | Description |
-|--------|-------------|
-| `extract()` | Main entry point, returns conversation data object |
-| `findChatContainer()` | Locates the main chat area |
-| `extractMessages()` | Collects all user and assistant messages |
-| `extractFormattedText()` | Preserves code blocks, lists, tables |
-
-**Output Format**:
-```javascript
-{
-  title: "Conversation Title",
-  platform: "claude" | "chatgpt",
-  messages: [
-    { role: "user", content: "...", timestamp: "..." },
-    { role: "assistant", content: "...", timestamp: "..." }
-  ],
-  exportDate: "2024-01-01T00:00:00.000Z"
-}
-```
-
-### 2. Popup UI (`src/popup/`)
-
-**Purpose**: User interface for triggering exports.
-
-**Files**:
-- `popup.html` - Minimal markup with single export button
-- `popup.css` - Clean, modern styling
-- `popup.js` - Controller that orchestrates the export flow
-
-**Key Object**: `PopupController`
-
-| Method | Description |
-|--------|-------------|
-| `handleExport()` | Main export workflow |
-| `injectContentScript()` | Ensures extractor is loaded |
-| `extractConversation()` | Requests data from content script |
-| `exportToPDF()` | Triggers PDF generation and download |
-
-### 3. PDF Exporter (`src/popup/pdf-exporter.js`)
-
-**Purpose**: Converts conversation data into formatted PDF.
-
-**Key Object**: `PDFExporter`
-
-| Method | Description |
-|--------|-------------|
-| `export()` | Main entry, returns jsPDF document |
-| `renderHeader()` | Title and export date |
-| `renderMessage()` | Single message with header and content |
-| `renderTextPart()` | Regular text with list detection |
-| `renderCodeBlock()` | Formatted code with language label |
-| `parseListItem()` | Detects bullets and numbers |
-
-**PDF Structure**:
-- Header: Title + export timestamp
-- Messages: Colored header bar (blue=user, orange=Claude, green=ChatGPT) + content
-- Code blocks: Gray background, monospace font, language label
-- Lists: Proper indentation with bullet/number preservation
-- Tables: Markdown-style table rendering
-
-### 4. Background Script (`src/background/background.js`)
-
-**Purpose**: Handles file downloads (required due to extension security model).
-
-**Key Object**: `DownloadManager`
-
-| Method | Description |
-|--------|-------------|
-| `downloadPDF()` | Creates blob from base64 and triggers download |
-| `base64ToBlob()` | Converts base64 string to binary Blob |
-
-## Message Flow
+### Message Flow
 
 ```
 User clicks "Export as PDF"
-         │
-         ▼
-   PopupController
-         │
-         ├──► Detects platform (Claude/ChatGPT)
-         │
-         ├──► Injects appropriate extractor
-         │           │
-         │           ▼
-         │    Extractor.extract()
-         │           │
-         │           ▼
-         │    Returns conversation data
-         │
-         ├──► PDFExporter.export(data)
-         │           │
-         │           ▼
-         │    Returns jsPDF document
-         │
-         ├──► Converts to base64
-         │
-         └──► Sends 'downloadPDF' to background
-                     │
-                     ▼
-              DownloadManager.downloadPDF()
-                     │
-                     ▼
-              Browser download dialog
+  -> popup.js detects platform
+  -> Injects appropriate content script
+  -> Content script extracts conversation data
+  -> PDFExporter.export(data, platform, settings)
+  -> Loads jsPDF, emoji font, MathJax
+  -> Renders header, messages, code, tables, math
+  -> Sends base64 PDF to background script
+  -> background.js triggers browser download
 ```
 
 ## Browser Permissions
@@ -201,10 +143,19 @@ User clicks "Export as PDF"
 |------------|--------|
 | `activeTab` | Access current tab to inject content script |
 | `downloads` | Save generated PDF files |
+| `storage` | Persist user settings across sessions |
 
 ## Dependencies
 
-- **jsPDF 2.x** (`lib/jspdf.umd.min.js`) - PDF generation library
+- **jsPDF 2.5.1** - PDF generation
+- **MathJax 3** (tex-svg.js) - LaTeX equation rendering
+- **Noto Emoji** (subset) - Emoji glyph rendering via PUA remapping
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) - Technical deep-dive into extension contexts, data flow, and component design
+- [Changelog](docs/CHANGELOG.md) - Version history and release notes
+- [Emoji & LaTeX Implementation](docs/260208a_emoji_and_latex_pdf_rendering.md) - Detailed implementation log for emoji PUA remapping and LaTeX rendering
 
 ## Troubleshooting
 
@@ -212,9 +163,13 @@ User clicks "Export as PDF"
 - Ensure you're on a conversation page (not the home page)
 - The chat must have at least one exchange
 
-### PDF has wrong content
-- The extension extracts from the visible conversation only
-- Sidebar chat history is intentionally excluded
+### Emoji not rendering
+- The extension includes 335 common emoji. Unsupported emoji are silently omitted
+- If no emoji render at all, check the browser console for font loading errors
+
+### LaTeX equations showing as raw text
+- MathJax needs a moment to initialize on first export
+- If equations consistently fail, check the browser console for MathJax errors
 
 ### Extension not appearing
 - Check `about:debugging` for errors

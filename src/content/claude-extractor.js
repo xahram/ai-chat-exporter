@@ -195,6 +195,20 @@ const ChatExtractor = {
   extractFormattedText(element) {
     const clone = element.cloneNode(true);
 
+    // Handle KaTeX math equations - preserve raw LaTeX for PDF renderer
+    clone.querySelectorAll('.katex').forEach(katex => {
+      const annotation = katex.querySelector('annotation[encoding="application/x-tex"]');
+      if (annotation) {
+        const latex = annotation.textContent.trim();
+        const isDisplay = katex.closest('.katex-display') !== null;
+        const delimiter = isDisplay ? '$$' : '$';
+        katex.replaceWith(document.createTextNode(`${delimiter}${latex}${delimiter}`));
+      } else {
+        const mathml = katex.querySelector('.katex-mathml');
+        if (mathml) mathml.remove();
+      }
+    });
+
     // Handle code blocks - use textContent to avoid spacing from syntax highlighting spans
     clone.querySelectorAll('pre').forEach(pre => {
       const code = pre.querySelector('code');
@@ -225,6 +239,11 @@ const ChatExtractor = {
       if (!code.closest('pre')) {
         code.replaceWith(document.createTextNode(`\`${code.textContent}\``));
       }
+    });
+
+    // Handle horizontal rules
+    clone.querySelectorAll('hr').forEach(hr => {
+      hr.replaceWith(document.createTextNode('\n---\n'));
     });
 
     // Handle bold/strong text
