@@ -12,35 +12,61 @@ const PDFExporter = {
   yPosition: 0,
   platform: 'Claude', // Default platform name
 
-  // Emoji codepoints included in our subset font
-  SUBSET_EMOJIS: new Set([
-    0x261D, 0x2615, 0x2699, 0x26A0, 0x26A1, 0x267B, 0x270B, 0x270C,
-    0x2705, 0x2714, 0x2716, 0x2728, 0x274C, 0x2753, 0x2757, 0x2764,
-    0x27A1, 0x2B05, 0x2B06, 0x2B07, 0x2B50,
-    0x1F31F, 0x1F381, 0x1F389, 0x1F38A, 0x1F3AF, 0x1F3C6,
-    0x1F44A, 0x1F44B, 0x1F44C, 0x1F44D, 0x1F44E, 0x1F44F,
-    0x1F494, 0x1F499, 0x1F49A, 0x1F49B, 0x1F49C, 0x1F4A1,
-    0x1F4A5, 0x1F4AA, 0x1F4AF, 0x1F4BB, 0x1F4CB, 0x1F4CC,
-    0x1F4CE, 0x1F4D6, 0x1F4DA, 0x1F4DD, 0x1F4E7, 0x1F4F1,
-    0x1F504, 0x1F50D, 0x1F511, 0x1F512, 0x1F513, 0x1F517,
-    0x1F525, 0x1F527, 0x1F5A4, 0x1F600, 0x1F601, 0x1F602,
-    0x1F603, 0x1F604, 0x1F605, 0x1F606, 0x1F609, 0x1F60A,
-    0x1F60D, 0x1F60E, 0x1F60F, 0x1F610, 0x1F612, 0x1F614,
-    0x1F615, 0x1F618, 0x1F61E, 0x1F620, 0x1F622, 0x1F62D,
-    0x1F62E, 0x1F631, 0x1F633, 0x1F634, 0x1F642, 0x1F643,
-    0x1F644, 0x1F64C, 0x1F64F, 0x1F680, 0x1F6AB, 0x1F6D1,
-    0x1F91D, 0x1F91E, 0x1F914, 0x1F917, 0x1F923, 0x1F929,
-    0x1F970, 0x1F973, 0x1F97A, 0x1F9E1,
+  // Map original emoji codepoints to PUA codepoints used in our subset font.
+  // jsPDF can't handle codepoints above U+FFFF, so the font remaps all emojis
+  // to the Private Use Area (U+E000+) where jsPDF can render them.
+  EMOJI_TO_PUA: new Map([
+    [0x2615, 0xE000], [0x261D, 0xE001], [0x267B, 0xE002], [0x2699, 0xE003],
+    [0x26A0, 0xE004], [0x26A1, 0xE005], [0x2705, 0xE006], [0x270B, 0xE007],
+    [0x270C, 0xE008], [0x2714, 0xE009], [0x2716, 0xE00A], [0x2728, 0xE00B],
+    [0x274C, 0xE00C], [0x2753, 0xE00D], [0x2757, 0xE00E], [0x2764, 0xE00F],
+    [0x27A1, 0xE010], [0x2B05, 0xE011], [0x2B06, 0xE012], [0x2B07, 0xE013],
+    [0x2B50, 0xE014],
+    [0x1F31F, 0xE015], [0x1F381, 0xE016], [0x1F389, 0xE017], [0x1F38A, 0xE018],
+    [0x1F3AE, 0xE019], [0x1F3AF, 0xE01A], [0x1F3C6, 0xE01B],
+    [0x1F44A, 0xE01C], [0x1F44B, 0xE01D], [0x1F44C, 0xE01E], [0x1F44D, 0xE01F],
+    [0x1F44E, 0xE020], [0x1F44F, 0xE021],
+    [0x1F494, 0xE022], [0x1F499, 0xE023], [0x1F49A, 0xE024], [0x1F49B, 0xE025],
+    [0x1F49C, 0xE026], [0x1F4A1, 0xE027], [0x1F4A5, 0xE028], [0x1F4AA, 0xE029],
+    [0x1F4AF, 0xE02A], [0x1F4B0, 0xE02B], [0x1F4BB, 0xE02C], [0x1F4CB, 0xE02D],
+    [0x1F4CC, 0xE02E], [0x1F4CE, 0xE02F], [0x1F4D6, 0xE030], [0x1F4DA, 0xE031],
+    [0x1F4DD, 0xE032], [0x1F4E7, 0xE033], [0x1F4F1, 0xE034],
+    [0x1F504, 0xE035], [0x1F50D, 0xE036], [0x1F511, 0xE037], [0x1F512, 0xE038],
+    [0x1F513, 0xE039], [0x1F517, 0xE03A], [0x1F525, 0xE03B], [0x1F527, 0xE03C],
+    [0x1F5A4, 0xE03D],
+    [0x1F600, 0xE03E], [0x1F601, 0xE03F], [0x1F602, 0xE040], [0x1F603, 0xE041],
+    [0x1F604, 0xE042], [0x1F605, 0xE043], [0x1F606, 0xE044], [0x1F609, 0xE045],
+    [0x1F60A, 0xE046], [0x1F60D, 0xE047], [0x1F60E, 0xE048], [0x1F60F, 0xE049],
+    [0x1F610, 0xE04A], [0x1F612, 0xE04B], [0x1F614, 0xE04C], [0x1F615, 0xE04D],
+    [0x1F618, 0xE04E], [0x1F61E, 0xE04F], [0x1F620, 0xE050], [0x1F622, 0xE051],
+    [0x1F62D, 0xE052], [0x1F62E, 0xE053], [0x1F631, 0xE054], [0x1F633, 0xE055],
+    [0x1F634, 0xE056], [0x1F642, 0xE057], [0x1F643, 0xE058], [0x1F644, 0xE059],
+    [0x1F64C, 0xE05A], [0x1F64F, 0xE05B],
+    [0x1F680, 0xE05C], [0x1F6AB, 0xE05D], [0x1F6D1, 0xE05E],
+    [0x1F914, 0xE05F], [0x1F916, 0xE060], [0x1F917, 0xE061], [0x1F91D, 0xE062],
+    [0x1F91E, 0xE063], [0x1F923, 0xE064], [0x1F929, 0xE065],
+    [0x1F970, 0xE066], [0x1F973, 0xE067], [0x1F97A, 0xE068], [0x1F9E1, 0xE069],
   ]),
 
   /**
-   * Checks if a character is in our emoji subset font
+   * Checks if a character is a supported emoji and returns its PUA replacement
+   * @param {string} char
+   * @returns {string|null} PUA character or null if not supported
+   */
+  getEmojiPUA(char) {
+    if (!this.emojiFont) return null;
+    const pua = this.EMOJI_TO_PUA.get(char.codePointAt(0));
+    return pua ? String.fromCharCode(pua) : null;
+  },
+
+  /**
+   * Checks if a character is a PUA-mapped emoji
    * @param {string} char
    * @returns {boolean}
    */
-  isSubsetEmoji(char) {
-    if (!this.emojiFont) return false;
-    return this.SUBSET_EMOJIS.has(char.codePointAt(0));
+  isPUAEmoji(char) {
+    const code = char.codePointAt(0);
+    return code >= 0xE000 && code <= 0xE069;
   },
 
   /**
@@ -92,25 +118,26 @@ const PDFExporter = {
       .replace(/[\u2000-\u200A]/g, ' ')
       // Remove word joiners and other invisible chars
       .replace(/[\u2060-\u206F]/g, '')
-      // Dingbats (preserve subset: ✅✔✖☑☝✋✌➡ etc.)
-      .replace(/[\u2700-\u27BF]/g, char => {
-        return this.isSubsetEmoji(char) ? char : '';
+      // Dingbats and emojis: replace supported ones with PUA equivalents, strip others
+      .replace(/[\u2600-\u27BF]/g, char => {
+        const pua = this.getEmojiPUA(char);
+        return pua || '';
       })
-      // Emojis (preserve those in our subset font)
       .replace(/[\u{1F300}-\u{1F9FF}]/gu, char => {
-        return this.isSubsetEmoji(char) ? char : '';
+        const pua = this.getEmojiPUA(char);
+        return pua || '';
       });
 
-    // Final cleanup: ensure only printable ASCII, extended Latin, and supported emojis
-    // Use Array.from to correctly iterate over multi-byte emoji characters
+    // Final cleanup: ensure only printable ASCII, extended Latin, and PUA emoji
+    // Use Array.from to correctly iterate over multi-byte characters
     result = Array.from(result).map(char => {
       const code = char.codePointAt(0);
       // Allow: printable ASCII (32-126), newlines/tabs, and extended Latin (160-255)
       if ((code >= 32 && code <= 126) || code === 10 || code === 13 || code === 9 || (code >= 160 && code <= 255)) {
         return char;
       }
-      // Allow supported emoji characters
-      if (this.isSubsetEmoji(char)) {
+      // Allow PUA emoji characters (already remapped)
+      if (this.isPUAEmoji(char)) {
         return char;
       }
       // Replace other chars with space or empty based on category
@@ -285,7 +312,13 @@ const PDFExporter = {
     doc.setFillColor(color[0], color[1], color[2]);
     doc.setTextColor(255, 255, 255);
 
-    doc.roundedRect(margin, this.yPosition - 5, contentWidth, 10, 2, 2, 'F');
+    // Scale rectangle and text position based on header font size
+    const fontSize = s.headerFontSize || 11;
+    const fontPt = fontSize * 0.3528; // pt to mm
+    const rectHeight = fontPt + 4;
+    const rectTop = this.yPosition - rectHeight / 2;
+
+    doc.roundedRect(margin, rectTop, contentWidth, rectHeight, 2, 2, 'F');
 
     // Get display name from settings or use defaults
     const userLabel = s.userDisplayName || 'You';
@@ -293,8 +326,12 @@ const PDFExporter = {
     if (platform === 'Claude' && s.claudeDisplayName) llmLabel = s.claudeDisplayName;
     else if (platform === 'ChatGPT' && s.chatgptDisplayName) llmLabel = s.chatgptDisplayName;
     else if (platform === 'Gemini' && s.geminiDisplayName) llmLabel = s.geminiDisplayName;
-    doc.text(isUser ? userLabel : llmLabel, margin + 5, this.yPosition + 1);
-    this.yPosition += 12;
+    // Position text baseline so cap-height is vertically centered in rect
+    // Cap-height is ~70% of font size; baseline = rectTop + (rectHeight + capHeight) / 2
+    const capHeight = fontPt * 0.7;
+    const textY = rectTop + (rectHeight + capHeight) / 2;
+    doc.text(isUser ? userLabel : llmLabel, margin + 5, textY);
+    this.yPosition = rectTop + rectHeight + 4;
   },
 
   /**
@@ -526,7 +563,7 @@ const PDFExporter = {
     let currentIsEmoji = false;
 
     for (const char of text) {
-      const isEmoji = this.isSubsetEmoji(char);
+      const isEmoji = this.isPUAEmoji(char);
       if (isEmoji !== currentIsEmoji && currentRun) {
         runs.push({ text: currentRun, isEmoji: currentIsEmoji });
         currentRun = '';

@@ -64,9 +64,13 @@ const PopupController = {
     document.getElementById('chatgptDisplayName').value = this.settings.chatgptDisplayName;
     document.getElementById('geminiDisplayName').value = this.settings.geminiDisplayName;
     document.getElementById('userHeaderColor').value = this.settings.userHeaderColor;
+    document.getElementById('userHeaderColorPreview').style.background = this.settings.userHeaderColor;
     document.getElementById('claudeHeaderColor').value = this.settings.claudeHeaderColor;
+    document.getElementById('claudeHeaderColorPreview').style.background = this.settings.claudeHeaderColor;
     document.getElementById('chatgptHeaderColor').value = this.settings.chatgptHeaderColor;
+    document.getElementById('chatgptHeaderColorPreview').style.background = this.settings.chatgptHeaderColor;
     document.getElementById('geminiHeaderColor').value = this.settings.geminiHeaderColor;
+    document.getElementById('geminiHeaderColorPreview').style.background = this.settings.geminiHeaderColor;
     document.getElementById('contentFontSize').value = this.settings.contentFontSize;
     document.getElementById('headerFontSize').value = this.settings.headerFontSize;
   },
@@ -143,8 +147,23 @@ const PopupController = {
       this.resetSettings();
     });
 
-    // Auto-save on any input change
-    const settingInputs = document.querySelectorAll('#settingsPanel input');
+    // Sync hex color inputs with preview swatches
+    const colorIds = ['userHeaderColor', 'claudeHeaderColor', 'chatgptHeaderColor', 'geminiHeaderColor'];
+    colorIds.forEach(id => {
+      const input = document.getElementById(id);
+      const preview = document.getElementById(id + 'Preview');
+
+      input.addEventListener('input', () => {
+        const val = input.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+          preview.style.background = val;
+          this.readSettingsFromUI();
+        }
+      });
+    });
+
+    // Auto-save on any other input change
+    const settingInputs = document.querySelectorAll('#settingsPanel input:not(.color-hex)');
     settingInputs.forEach(input => {
       input.addEventListener('change', () => this.readSettingsFromUI());
     });

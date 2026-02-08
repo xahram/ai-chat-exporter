@@ -353,18 +353,26 @@ body {
   flex: 1;
 }
 
-.setting-row input[type="color"] {
-  width: 36px;
-  height: 28px;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  padding: 2px;
-  cursor: pointer;
-  background: #fafafa;
+.color-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.setting-row input[type="color"]:hover {
-  border-color: #d0d0d0;
+.color-preview {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e5e5e5;
+  flex-shrink: 0;
+}
+
+.color-hex {
+  width: 72px !important;
+  padding: 5px 6px !important;
+  font-size: 12px !important;
+  font-family: monospace !important;
+  text-transform: uppercase;
 }
 
 .btn-reset {
