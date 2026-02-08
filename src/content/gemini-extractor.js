@@ -195,7 +195,23 @@ const GeminiExtractor = {
       '.export-sheets-button'
     ].join(', ')).forEach(el => el.remove());
 
-    // Handle KaTeX math equations - preserve raw LaTeX for PDF renderer
+    // Handle math blocks - Gemini uses data-math attribute on .math-block containers
+    clone.querySelectorAll('.math-block[data-math]').forEach(mathBlock => {
+      const latex = mathBlock.getAttribute('data-math').trim();
+      if (latex) {
+        mathBlock.replaceWith(document.createTextNode(`\n$$${latex}$$\n`));
+      }
+    });
+
+    // Handle inline math - Gemini uses data-math on .math-inline containers
+    clone.querySelectorAll('.math-inline[data-math]').forEach(mathInline => {
+      const latex = mathInline.getAttribute('data-math').trim();
+      if (latex) {
+        mathInline.replaceWith(document.createTextNode(`$${latex}$`));
+      }
+    });
+
+    // Handle KaTeX elements without data-math (fallback)
     clone.querySelectorAll('.katex').forEach(katex => {
       const annotation = katex.querySelector('annotation[encoding="application/x-tex"]');
       if (annotation) {

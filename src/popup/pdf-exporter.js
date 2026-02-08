@@ -622,6 +622,26 @@ const PDFExporter = {
         return;
       }
 
+      // Render markdown headings (# H1, ## H2, ### H3, etc.)
+      const headingMatch = paragraph.match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const headingText = headingMatch[2].replace(/\*\*(.+?)\*\*/g, '$1');
+        const baseFontSize = s.contentFontSize || 10;
+        const headingSize = baseFontSize + Math.max(0, 4 - level);
+        this.yPosition += 3;
+        this.checkPageBreak(8);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(headingSize);
+        const normalizedHeading = this.normalizeText(headingText);
+        const segments = [{ text: normalizedHeading, bold: true }];
+        this.renderFormattedLine(segments, margin + 3);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(baseFontSize);
+        this.yPosition += headingSize * 0.5 + 3;
+        return;
+      }
+
       const { bulletChar, text, indent } = this.parseListItem(paragraph);
 
       // Render bullet/number
