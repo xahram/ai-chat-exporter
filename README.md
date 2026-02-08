@@ -175,6 +175,14 @@ User clicks "Export as PDF"
 - Check `about:debugging` for errors
 - Ensure manifest.json is valid JSON
 
+## Releasing a New Version
+
+When publishing a new version, update the version number in **all three places**:
+
+1. **`manifest.json`** — line 4: `"version": "x.y.z"`
+2. **`src/popup/popup.html`** — footer: `v.x.y.z - Claude.ai, ChatGPT & Gemini`
+3. **`docs/changelogs/changelog_x.y.z.md`** — create new file with changes, then add a row to `docs/CHANGELOG.md`
+
 ## License
 
 MIT
